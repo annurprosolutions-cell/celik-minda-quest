@@ -5,13 +5,13 @@ const Sound = (() => {
   const PREF = {
     ms: { main: ['ms-MY', 'ms'], name: /malay|melayu/i, fallback: ['id-ID', 'id'] },
     en: { main: ['en-GB', 'en-US', 'en'], name: /english/i, fallback: [] },
-    ar: { main: ['ar-SA', 'ar'], name: /arab|عرب/i, fallback: [] },
+    ar: { main: ['ar'], name: /arab|عرب/i, fallback: [] },
   };
   const TAG = { ms: 'ms-MY', en: 'en-GB', ar: 'ar-SA' };
-  const GOOD = /natural|online|neural|enhanced|premium|google/i;
+  const GOOD = /google|natural|online/i;
   let voices = [];
   let settings = { voice: true, sfx: true, rate: 0.85 };
-  let actx = null, timer = null;
+  let actx = null, timer = null, run = 0, alive = [];
   const reported = new Set();
   const api = { onIssue: null };
 
@@ -50,6 +50,7 @@ const Sound = (() => {
       return { lang: l, ok: !!v, name: v ? v.name : null, fallback };
     });
   }
+  function voiceList() { loadVoices(); return voices.map(v => ({ name: v.name, lang: v.lang })); }
 
   function report(lang, kind) {
     const k = lang + ':' + kind; if (reported.has(k)) return;
@@ -96,29 +97,43 @@ const Sound = (() => {
     return out;
   }
 
+  // Sentiasa cuba bercakap walaupun suara tiada dalam senarai: di telefon, enjin suara (Google/Samsung)
+  // selalunya masih boleh sebut ikut kod bahasa sahaja. Sama seperti Kata Ceria.
   function utterance(text, lang) {
-    const { v, fallback } = pickVoice(lang);
-    if (!v && voices.length) { report(lang, 'missing'); return null; }   // jangan baca dengan suara bahasa lain
-    if (fallback) report(lang, 'fallback');
     const u = new SpeechSynthesisUtterance(text);
-    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = TAG[lang] || lang;
-    u.rate = settings.rate; u.pitch = 1.05;
+    u.lang = TAG[lang] || lang;
+    const { v, fallback } = pickVoice(lang);
+    if (v) { u.voice = v; u.lang = v.lang; }
+    if (fallback) report(lang, 'fallback');
+    u.rate = settings.rate; u.pitch = 1.05; u.volume = 1;
     return u;
   }
 
   function stop() {
-    clearTimeout(timer); timer = null;
+    run++; clearTimeout(timer); timer = null; alive = [];
     if ('speechSynthesis' in window) try { speechSynthesis.cancel(); } catch (e) { }
+  }
+
+  // Sebut satu demi satu: bahagian seterusnya hanya bermula selepas bahagian sebelumnya habis
+  function chain(list, id) {
+    const u = list.shift(); if (!u || id !== run) return;
+    let done = false;
+    const next = () => { if (done) return; done = true; clearTimeout(timer); if (id === run) timer = setTimeout(() => chain(list, id), 40); };
+    u.onend = next; u.onerror = next;
+    alive.push(u);   // simpan rujukan supaya onend tidak hilang (pepijat Chrome)
+    try { speechSynthesis.speak(u); } catch (e) { next(); return; }
+    if (list.length) timer = setTimeout(next, 900 + String(u.text).length * 160 / (settings.rate || 1));
   }
 
   function speak(text, lang = 'ms') {
     if (!settings.voice || !('speechSynthesis' in window) || text == null || text === '') return;
     try {
       stop();
-      const list = pieces(text, lang).map(([t, l]) => utterance(t, l) || (l === 'en' && lang === 'ms' ? utterance(t.toLowerCase(), 'ms') : null)).filter(Boolean);
+      const list = pieces(text, lang).map(([t, l]) => utterance(t, l));
       if (!list.length) return;
-      // Chrome kadang-kadang abaikan speak() yang dipanggil serta-merta selepas cancel(), jadi beri jeda kecil
-      timer = setTimeout(() => { timer = null; list.forEach(u => { try { speechSynthesis.speak(u); } catch (e) { } }); }, 60);
+      const id = run;
+      // Chrome (terutama Android) abaikan speak() yang dipanggil serta-merta selepas cancel(), jadi beri jeda kecil
+      timer = setTimeout(() => chain(list, id), 40);
     } catch (e) { /* abaikan */ }
   }
 
@@ -152,12 +167,8 @@ const Sound = (() => {
   function sfx(name) { if (settings.sfx && FX[name]) try { FX[name](); } catch (e) { } }
 
   return Object.assign(api, {
-    speak, sfx, voiceStatus, stop,
+    speak, sfx, voiceStatus, voiceList, stop,
     configure(s) { Object.assign(settings, s); },
-    unlock() {
-      ctx(); loadVoices();
-      // iOS: ucapan pertama mesti bermula dalam sentuhan pengguna
-      try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { }
-    },
+    unlock() { ctx(); loadVoices(); },
   });
 })();
