@@ -27,6 +27,10 @@ Permainan pengembaraan (PWA) untuk murid PASTI 5 & 6 tahun. Ia berdasarkan kerta
 | Silang kata Jawi | Grid silang kata, isi dengan jubin huruf Jawi |
 
 **Suara:** BM disebut dalam BM, BI dalam BI, dan Arab dalam Arab (Web Speech API). Jawi disebut dalam BM.
+- BM guna suara Melayu (Malaysia). Suara Indonesia hanya dipakai jika peranti langsung tiada suara Melayu, dan aplikasi akan beritahu.
+- Huruf konsonan disebut ikut nama huruf Malaysia (H = "eic", Z = "zed"), bukan cara Indonesia ("ha", "zet"). Vokal a, e, i, o, u kekal bunyi BM.
+- Nombor dibaca dalam BM Malaysia (8 = "lapan", RM2 = "dua ringgit").
+- Gambar dalam soalan English disebut dalam English (senarai `ICON_EN` dalam `js/data.js`). Jubin huruf Arab disebut nama hurufnya dalam Arab, dan jubin huruf Jawi dalam BM.
 
 ## Cara jalankan
 
@@ -55,7 +59,7 @@ Kemudian di Netlify: Add new site → Import from Git → pilih repo. Tiada buil
 
 Selepas dibuka sekali, aplikasi disimpan dan boleh dimain tanpa internet.
 
-> Untuk suara Bahasa Melayu yang lebih baik di Android, pergi ke Tetapan → Pertuturan teks (Google) → muat turun Bahasa Melayu. Jika tiada, aplikasi guna suara Bahasa Indonesia. Status suara boleh dilihat dalam ⚙️ Tetapan.
+> Suara datang daripada pelayar dan peranti. Di komputer, guna **Microsoft Edge** kerana ia ada suara Melayu (Malaysia) dan Arab; Chrome di Windows selalunya tiada kedua-duanya. Di Android: Tetapan → Pertuturan teks (Google) → muat turun Melayu (Malaysia) dan Arab. Di iPhone: Settings → Accessibility → Spoken Content → Voices. Status suara boleh dilihat dalam ⚙️ Tetapan.
 
 ## Struktur fail
 ```

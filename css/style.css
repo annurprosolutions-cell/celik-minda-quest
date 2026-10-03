@@ -345,7 +345,7 @@ h3.sec { margin: 18px 0 10px; font-size: 18px; }
 .settings input[type=checkbox] { width: 26px; height: 26px; accent-color: var(--pri); }
 .voices { background: #fff; padding: 14px 16px; border-radius: 16px; } .voices h4 { margin: 0 0 8px; }
 .vrow { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; font-size: 14px; }
-.vrow b.ok { color: var(--ok); font-weight: 600; } .vrow b.no { color: var(--bad); }
+.vrow b.ok { color: var(--ok); font-weight: 600; } .vrow b.no { color: var(--bad); } .vrow b.warn { color: #b26a00; font-weight: 600; }
 .sbtns { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ---------- konfeti ---------- */

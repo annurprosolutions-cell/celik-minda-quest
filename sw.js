@@ -1,5 +1,5 @@
 /* Service worker: simpan aplikasi untuk main tanpa internet */
-const VERSION = 'cmq-v1.1.1';
+const VERSION = 'cmq-v1.2.0';
 const APP = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/data.js', './js/papers.js', './js/sound.js', './js/avatar.js', './js/world.js', './js/quiz.js', './js/app.js',

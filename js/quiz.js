@@ -8,18 +8,44 @@ function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { co
 const norm = v => String(v ?? '').trim().replace(/\s+/g, ' ');
 
 /* ---------- sebutan item ---------- */
+// Nama huruf tunggal: Arab disebut dengan suara Arab, Jawi disebut dalam BM
+const AR_LETTER = {
+  'ا': 'أَلِف', 'أ': 'أَلِف', 'إ': 'أَلِف', 'آ': 'أَلِف', 'ب': 'بَاء', 'ت': 'تَاء', 'ث': 'ثَاء', 'ج': 'جِيم', 'ح': 'حَاء', 'خ': 'خَاء',
+  'د': 'دَال', 'ذ': 'ذَال', 'ر': 'رَاء', 'ز': 'زَاي', 'س': 'سِين', 'ش': 'شِين', 'ص': 'صَاد', 'ض': 'ضَاد', 'ط': 'طَاء', 'ظ': 'ظَاء',
+  'ع': 'عَيْن', 'غ': 'غَيْن', 'ف': 'فَاء', 'ق': 'قَاف', 'ك': 'كَاف', 'ل': 'لَام', 'م': 'مِيم', 'ن': 'نُون', 'ه': 'هَاء', 'و': 'وَاو',
+  'ي': 'يَاء', 'ى': 'أَلِف مَقْصُورَة', 'ة': 'تَاء مَرْبُوطَة', 'ء': 'هَمْزَة',
+};
+const JW_LETTER = {
+  'ا': 'alif', 'ب': 'ba', 'ت': 'ta', 'ث': 'sa', 'ج': 'jim', 'چ': 'ca', 'ح': 'ha', 'خ': 'kho', 'د': 'dal', 'ذ': 'zal', 'ر': 'ra',
+  'ز': 'zai', 'س': 'sin', 'ش': 'syin', 'ص': 'sod', 'ض': 'dod', 'ط': 'to', 'ظ': 'zo', 'ع': 'ain', 'غ': 'ghain', 'ڠ': 'nga',
+  'ف': 'fa', 'ڤ': 'pa', 'ق': 'qaf', 'ك': 'kaf', 'ک': 'kaf', 'ݢ': 'ga', 'ل': 'lam', 'م': 'mim', 'ن': 'nun', 'و': 'wau',
+  'ۏ': 'va', 'ه': 'ha', 'ة': 'ta marbutah', 'ء': 'hamzah', 'ي': 'ya', 'ى': 'ya', 'ڽ': 'nya',
+};
+function textSpeech(t, sub) {
+  t = String(t);
+  if (AR_RE.test(t)) {
+    const one = t.trim();
+    if (sub === 'JW') return JW_LETTER[one] ? ['huruf ' + JW_LETTER[one], 'ms'] : null;
+    return [AR_LETTER[one] || t, 'ar'];
+  }
+  return [t, sub === 'BI' ? 'en' : 'ms'];
+}
 function itemSpeech(it, sub) {
   if (!it) return null;
   if (it.say) return [it.say, it.lang || (sub === 'BI' ? 'en' : 'ms')];
-  if (it.t != null) {
-    if (AR_RE.test(it.t)) { if (it.r) return [it.r, 'ms']; if (sub === 'JW') return null; return [it.t, 'ar']; }
-    return [it.t, sub === 'BI' ? 'en' : 'ms'];
+  if (it.t != null) { if (AR_RE.test(it.t) && it.r) return [it.r, 'ms']; return textSpeech(it.t, sub); }
+  if (sub === 'BI') {
+    // Soalan English: sebut nama gambar dalam English, bukan nama Melayu
+    const en = (it.label && !AR_RE.test(it.label) && !/_/.test(it.label) && it.label) || (it.p && ICON_EN[it.p])
+      || (it.pp && it.pp.map(x => ICON_EN[x.p] || x.w || x.p).join(', ')) || (it.sw && it.w);
+    if (en) return [en, 'en'];
   }
-  if (it.label && !AR_RE.test(it.label) && sub === 'BI' && !/_/.test(it.label)) return [it.label, 'en'];
   if (it.pp) return [it.pp.map(x => x.w || x.p).join(', '), 'ms'];
   const w = it.w || it.p; return w ? [w, 'ms'] : null;
 }
 function speakItem(it, sub) { const s = itemSpeech(it, sub); if (s) Sound.speak(s[0], s[1]); }
+// Huruf rumi tunggal: BM sebut "huruf b", English sebut nama huruf sahaja
+function speakLetter(ch, sub) { if (AR_RE.test(ch)) speakItem({ t: ch }, sub); else Sound.speak(sub === 'BI' ? ch : 'huruf ' + ch, sub === 'BI' ? 'en' : 'ms'); }
 
 /* ---------- paparan item ---------- */
 function iconHTML(name) {
@@ -118,7 +144,7 @@ function rScatter(q, sub, root, ctx) {
     e.style.left = (10 + (c + 0.5 + (r % 2) * 0.25) * (75 / cols) + jx) + '%';
     e.style.top = (14 + (r + 0.5) * (72 / rowsN) + jy) + '%';
     e.addEventListener('click', () => {
-      Sound.speak('huruf ' + ch, 'ms'); if (ctx.locked) return; Sound.sfx('tap');
+      speakLetter(ch, sub); if (ctx.locked) return; Sound.sfx('tap');
       if (sel.has(i)) sel.delete(i); else sel.add(i); e.classList.toggle('sel', sel.has(i));
     });
     box.append(e); return e;
@@ -264,7 +290,7 @@ class Slots {
     });
     return b;
   }
-  speakTile(v) { if (AR_RE.test(v)) return; Sound.speak(v.length === 1 ? 'huruf ' + v : v, this.sub === 'BI' ? 'en' : 'ms'); }
+  speakTile(v) { if ([...v].length === 1 && !/\d/.test(v)) speakLetter(v, this.sub); else speakItem({ t: v }, this.sub); }
   dragify(t) {
     let st = null, ghost = null;
     t.addEventListener('pointerdown', e => {
@@ -356,7 +382,7 @@ function rArrange(q, sub, root, ctx) {
     row.words.forEach((w, wi) => {
       const c = div('chip', esc(w));
       c.addEventListener('click', () => {
-        Sound.speak(w.replace(/\./g, ''), 'ms'); if (ctx.locked || c.classList.contains('used')) return;
+        speakItem({ t: w.replace(/\./g, '') }, sub); if (ctx.locked || c.classList.contains('used')) return;
         Sound.sfx('drop'); c.classList.add('used'); st.picked.push(wi); render();
       });
       chips.append(c);
@@ -438,8 +464,10 @@ function renderQuestion(q, root, ctx) {
   const ctrls = parts.map(p => {
     const box = div('part');
     if (q.parts) {
-      box.append(div('ptitle', `<b>${esc(p.label)}.</b> ${esc(p.title)} <span class="pm">(${p.marks} markah)</span>`));
-      if (p.jawi) box.append(div('jawi-title ar', esc(p.jawi)));
+      const pt = div('ptitle', `<b>${esc(p.label)}.</b> ${esc(p.title)} <span class="pm">(${p.marks} markah)</span>`);
+      pt.addEventListener('click', () => Sound.speak(p.title.replace(/\s*\(asal:[^)]*\)/, ''), q.s === 'BI' ? 'en' : 'ms'));
+      box.append(pt);
+      if (p.jawi) { const jt = div('jawi-title ar', esc(p.jawi)); if (q.s === 'BA') jt.addEventListener('click', () => Sound.speak(p.jawi, 'ar')); box.append(jt); }
     }
     root.append(box);
     const c = RENDERERS[p.type](p, q.s, box, ctx); c.marks = p.marks; return c;
