@@ -194,10 +194,12 @@ class World {
   interact() { if (this.near && !this.paused) { this.keys = {}; this.joy = { x: 0, y: 0 }; this.hooks.onAct?.(this.near); } }
 
   loop(now) {
-    const dt = Math.min(0.05, (now - this.last) / 1000); this.last = now; this.t += dt;
+    // Jadual frame seterusnya dahulu supaya satu ralat lukisan tidak membekukan dunia selama-lamanya
+    requestAnimationFrame(t => this.loop(t));
+    // Timestamp rAF boleh lebih awal daripada performance.now() (frame pertama / selepas resume) → jangan biar dt negatif
+    const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000)); this.last = now; this.t += dt;
     if (!this.paused) this.update(dt);
     this.draw();
-    requestAnimationFrame(t => this.loop(t));
   }
 
   draw() {
