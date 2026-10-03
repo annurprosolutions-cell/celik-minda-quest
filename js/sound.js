@@ -1,51 +1,124 @@
 /* Sebutan (Web Speech API) + kesan bunyi (Web Audio) */
 'use strict';
 const Sound = (() => {
-  const LANG_PREF = {
-    ms: ['ms-MY', 'ms', 'id-ID', 'id'],      // Bahasa Indonesia sebagai sandaran jika suara Melayu tiada
-    en: ['en-GB', 'en-US', 'en'],
-    ar: ['ar-SA', 'ar-EG', 'ar'],
+  // Keutamaan suara. BM: Melayu Malaysia dahulu; Indonesia hanya sandaran terakhir jika peranti tiada suara Melayu.
+  const PREF = {
+    ms: { main: ['ms-MY', 'ms'], name: /malay|melayu/i, fallback: ['id-ID', 'id'] },
+    en: { main: ['en-GB', 'en-US', 'en'], name: /english/i, fallback: [] },
+    ar: { main: ['ar-SA', 'ar'], name: /arab|عرب/i, fallback: [] },
   };
   const TAG = { ms: 'ms-MY', en: 'en-GB', ar: 'ar-SA' };
+  const GOOD = /natural|online|neural|enhanced|premium|google/i;
   let voices = [];
   let settings = { voice: true, sfx: true, rate: 0.85 };
-  let actx = null;
+  let actx = null, timer = null;
+  const reported = new Set();
+  const api = { onIssue: null };
 
-  function loadVoices() { voices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() : []; }
+  function loadVoices() { try { voices = ('speechSynthesis' in window) ? speechSynthesis.getVoices() || [] : []; } catch (e) { voices = []; } }
   if ('speechSynthesis' in window) {
     loadVoices();
-    speechSynthesis.addEventListener?.('voiceschanged', loadVoices);
+    if (speechSynthesis.addEventListener) speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    else speechSynthesis.onvoiceschanged = loadVoices;
   }
 
-  function pickVoice(lang) {
-    const prefs = LANG_PREF[lang] || [lang];
-    for (const p of prefs) {
-      const lp = p.toLowerCase();
-      const exact = voices.filter(v => v.lang.toLowerCase().replace('_', '-') === lp);
-      const pool = exact.length ? exact : voices.filter(v => v.lang.toLowerCase().startsWith(lp));
-      if (pool.length) return pool.find(v => /google|natural|online/i.test(v.name)) || pool[0];
+  const vlang = v => (v.lang || '').toLowerCase().replace(/_/g, '-');
+  const best = pool => pool.find(v => GOOD.test(v.name)) || pool[0];
+  function byLang(codes) {
+    for (const c of codes) {
+      const lc = c.toLowerCase();
+      const exact = voices.filter(v => vlang(v) === lc);
+      const pool = exact.length ? exact : voices.filter(v => vlang(v).startsWith(lc));
+      if (pool.length) return best(pool);
     }
     return null;
+  }
+  // Pulangkan { v, fallback } — fallback = suara Indonesia digunakan kerana tiada suara Melayu
+  function pickVoice(lang) {
+    if (!voices.length) loadVoices();
+    const P = PREF[lang] || { main: [lang], fallback: [] };
+    const main = byLang(P.main) || (P.name && best(voices.filter(v => P.name.test(v.name))));
+    if (main) return { v: main, fallback: false };
+    const fb = byLang(P.fallback);
+    return fb ? { v: fb, fallback: true } : { v: null, fallback: false };
   }
 
   function voiceStatus() {
     loadVoices();
-    return Object.keys(LANG_PREF).map(l => {
-      const v = pickVoice(l);
-      const fallback = v && l === 'ms' && v.lang.toLowerCase().startsWith('id');
+    return Object.keys(PREF).map(l => {
+      const { v, fallback } = pickVoice(l);
       return { lang: l, ok: !!v, name: v ? v.name : null, fallback };
     });
   }
 
+  function report(lang, kind) {
+    const k = lang + ':' + kind; if (reported.has(k)) return;
+    reported.add(k); api.onIssue?.(lang, kind);
+  }
+
+  /* ---------- teks → sebutan ---------- */
+  const D = ['kosong', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'lapan', 'sembilan'];
+  function numMs(n) {
+    if (n < 10) return D[n];
+    if (n === 10) return 'sepuluh';
+    if (n === 11) return 'sebelas';
+    if (n < 20) return D[n - 10] + ' belas';
+    if (n < 100) return D[Math.floor(n / 10)] + ' puluh' + (n % 10 ? ' ' + D[n % 10] : '');
+    if (n < 1000) { const h = Math.floor(n / 100), r = n % 100; return (h === 1 ? 'seratus' : D[h] + ' ratus') + (r ? ' ' + numMs(r) : ''); }
+    if (n < 1e6) { const t = Math.floor(n / 1000), r = n % 1000; return (t === 1 ? 'seribu' : numMs(t) + ' ribu') + (r ? ' ' + numMs(r) : ''); }
+    return String(n);
+  }
+  // Nombor & simbol matematik dibaca dalam BM Malaysia (cth. 8 = "lapan", bukan "delapan")
+  function malayText(t) {
+    return t.replace(/RM\s?(\d+(?:\.\d+)?)/gi, '$1 ringgit')
+      .replace(/(\d)\s*\+\s*(?=\d)/g, '$1 tambah ').replace(/(\d)\s*[−–-]\s*(?=\d)/g, '$1 tolak ')
+      .replace(/(\d)\s*×\s*(?=\d)/g, '$1 darab ').replace(/(\d)\s*÷\s*(?=\d)/g, '$1 bahagi ')
+      .replace(/\s*=\s*/g, ' sama dengan ')
+      .replace(/\d+(?:\.\d+)?/g, s => { const [a, b] = s.split('.'); return numMs(+a) + (b ? ' perpuluhan ' + [...b].map(d => D[+d]).join(' ') : ''); });
+  }
+  const HAS_WORD = /[\p{L}\p{N}]/u;
+  const CONSONANT = /^[b-df-hj-np-tv-z]$/i;
+  // Pecahkan teks kepada [teks, bahasa]. Dalam BM, huruf konsonan tunggal disebut ikut nama huruf
+  // Malaysia (H = "eic", Z = "zed") menggunakan suara English, bukan cara Indonesia ("ha", "zet").
+  // Huruf vokal a, e, i, o, u kekal bunyi BM.
+  function pieces(text, lang) {
+    text = String(text);
+    if (lang === 'en' && /^\s*[a-z]\s*$/i.test(text)) return [[text.trim().toUpperCase(), 'en']];
+    if (lang !== 'ms') return [[text, lang]];
+    const out = [];
+    malayText(text).split(/(\s+|[,.;:!?·()"'“”])/).forEach(tok => {
+      if (!tok) return;
+      const last = out[out.length - 1];
+      if (!HAS_WORD.test(tok)) { if (last) last[0] += tok; return; }
+      const l = CONSONANT.test(tok) ? 'en' : 'ms', t = l === 'en' ? tok.toUpperCase() : tok;
+      if (last && last[1] === l) last[0] += t; else out.push([t, l]);
+    });
+    return out;
+  }
+
+  function utterance(text, lang) {
+    const { v, fallback } = pickVoice(lang);
+    if (!v && voices.length) { report(lang, 'missing'); return null; }   // jangan baca dengan suara bahasa lain
+    if (fallback) report(lang, 'fallback');
+    const u = new SpeechSynthesisUtterance(text);
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = TAG[lang] || lang;
+    u.rate = settings.rate; u.pitch = 1.05;
+    return u;
+  }
+
+  function stop() {
+    clearTimeout(timer); timer = null;
+    if ('speechSynthesis' in window) try { speechSynthesis.cancel(); } catch (e) { }
+  }
+
   function speak(text, lang = 'ms') {
-    if (!settings.voice || !('speechSynthesis' in window) || !text) return;
+    if (!settings.voice || !('speechSynthesis' in window) || text == null || text === '') return;
     try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(String(text));
-      const v = pickVoice(lang);
-      if (v) { u.voice = v; u.lang = v.lang; } else u.lang = TAG[lang] || lang;
-      u.rate = settings.rate; u.pitch = 1.05;
-      speechSynthesis.speak(u);
+      stop();
+      const list = pieces(text, lang).map(([t, l]) => utterance(t, l) || (l === 'en' && lang === 'ms' ? utterance(t.toLowerCase(), 'ms') : null)).filter(Boolean);
+      if (!list.length) return;
+      // Chrome kadang-kadang abaikan speak() yang dipanggil serta-merta selepas cancel(), jadi beri jeda kecil
+      timer = setTimeout(() => { timer = null; list.forEach(u => { try { speechSynthesis.speak(u); } catch (e) { } }); }, 60);
     } catch (e) { /* abaikan */ }
   }
 
@@ -78,10 +151,13 @@ const Sound = (() => {
   };
   function sfx(name) { if (settings.sfx && FX[name]) try { FX[name](); } catch (e) { } }
 
-  return {
-    speak, sfx, voiceStatus,
+  return Object.assign(api, {
+    speak, sfx, voiceStatus, stop,
     configure(s) { Object.assign(settings, s); },
-    unlock() { ctx(); },
-    stop() { if ('speechSynthesis' in window) speechSynthesis.cancel(); },
-  };
+    unlock() {
+      ctx(); loadVoices();
+      // iOS: ucapan pertama mesti bermula dalam sentuhan pengguna
+      try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) { }
+    },
+  });
 })();

@@ -56,6 +56,19 @@ const ICON = Object.assign({
   tisu: '🧻', guru: '👩‍🏫', kasut: '👟', tulang: '🦴', saku: '👖',
 }, SVG_ICON);
 
+/* Nama English bagi gambar — disebut bila gambar ditekan dalam soalan Bahasa Inggeris */
+const ICON_EN = {
+  tin: 'tin', matahari: 'sun', semut: 'ant', van: 'van', 'layang-layang': 'kite', tikus: 'rat', kek: 'cake', aiskrim: 'ice cream',
+  topi: 'hat', epal: 'apple', telur: 'egg', arnab: 'rabbit', 'rama-rama': 'butterfly', ayam: 'chicken', awan: 'cloud', rumput: 'grass',
+  beg: 'bag', bakul: 'basket', 'ibu dan bayi': 'mother and baby', adik: 'sister', oren: 'orange', ceri: 'cherry', 'dua mata': 'eyes',
+  telinga: 'ear', segi4: 'square', bulatan: 'circle', segi3: 'triangle', hidung: 'nose', rambut: 'hair', bibir: 'lips', durian: 'durian',
+  cawan: 'cup', stoking: 'socks', bapa: 'father', ibu: 'mother', ikan: 'fish', pisang: 'banana', jaring: 'net', potong: 'cut', kipas: 'fan',
+  pen: 'pen', kereta: 'car', kunci: 'key', kotak: 'box', tikar: 'mat', bola: 'ball', paku: 'nail', kerusi: 'chair', pagar: 'gate', pam: 'pump',
+  loceng: 'bell', baldi: 'pail', keldai: 'donkey', kucing: 'cat', anjing: 'dog', burung: 'bird', itik: 'duck', lembu: 'cow', gajah: 'elephant',
+  singa: 'lion', buku: 'book', rumah: 'house', pokok: 'tree', bunga: 'flower', bulan: 'moon', bintang: 'star', kasut: 'shoes', baju: 'shirt',
+  pensel: 'pencil', susu: 'milk', roti: 'bread', nasi: 'rice', sudu: 'spoon', jam: 'clock', mata: 'eye', kaki: 'foot', gigi: 'teeth', lidah: 'tongue',
+};
+
 const SUBJECTS = {
   BM: { name: 'Bahasa Melayu', lang: 'ms', color: '#ff7a59', icon: '📘' },
   BA: { name: 'Bahasa Arab', lang: 'ar', color: '#16a394', icon: '🕌' },

@@ -35,6 +35,11 @@ function closeScreen() {
 /* ---------------- Mula ---------------- */
 function init() {
   Sound.configure(DB.settings);
+  Sound.onIssue = (lang, kind) => {
+    const L = { ms: 'Melayu Malaysia', en: 'English', ar: 'Arab' }[lang];
+    toast(kind === 'fallback' ? 'Peranti ini tiada suara Melayu Malaysia, jadi guna suara Indonesia buat sementara. Lihat ⚙️ Tetapan untuk cara pasang.'
+      : `Peranti ini tiada suara ${L}. Lihat ⚙️ Tetapan untuk cara pasang.`);
+  };
   world = new World($('#world'), {
     onNear: z => {
       const b = $('#actBtn');
@@ -386,7 +391,7 @@ function runQuiz(cfg) {
     $('#qProg').style.width = pct(i, qs.length) + '%';
     card.innerHTML = `<div class="qmeta">${subjChip(q.s)}<span>Soalan ${i + 1}/${qs.length} · ${questionMarks(q)} markah</span></div>
       <div class="qtitle"><span>${i + 1}. ${esc(q.title)}</span><button class="btn icon sm" data-act="readq">🔊</button></div>
-      ${q.jawi ? `<div class="jawi-title ar">${esc(q.jawi)}</div>` : ''}${q.ar ? `<div class="jawi-title ar">${esc(q.ar)}</div>` : ''}
+      ${q.jawi ? `<div class="jawi-title ar">${esc(q.jawi)}</div>` : ''}${q.ar ? `<div class="jawi-title ar tappable" data-act="readar">${esc(q.ar)}</div>` : ''}
       ${q.sub ? `<div class="qsub">${esc(q.sub)}</div>` : ''}
       ${q.words ? `<div class="wordlist">${q.words.map((w, k) => `<span class="wl ar" data-w="${k}">${esc(w.t)}</span>`).join('')}</div>` : ''}
       <div class="qbody"></div>`;
@@ -396,7 +401,8 @@ function runQuiz(cfg) {
     card.scrollTop = 0; overlay.scrollTop = 0;
     readTitle(q);
   }
-  function readTitle(q) { Sound.speak(q.title, q.s === 'BI' ? 'en' : 'ms'); }
+  // Soalan berbahagian bertajuk nama subjek dalam BM ("Bahasa Inggeris"), jadi hanya soalan BI tunggal dibaca dalam English
+  function readTitle(q) { Sound.speak(q.title, q.s === 'BI' && !q.parts ? 'en' : 'ms'); }
   function check() {
     ctx.locked = true; const r = ctrl.check(); const q = qs[i];
     res.push({ q, got: r.got, max: r.max });
@@ -447,6 +453,7 @@ function runQuiz(cfg) {
     const a = e.target.closest('[data-act]')?.dataset.act;
     const w = e.target.closest('[data-w]'); if (w) { const it = qs[i].words[+w.dataset.w]; speakItem(it, 'JW'); }
     if (a === 'readq') readTitle(qs[i]);
+    if (a === 'readar') Sound.speak(qs[i].ar, 'ar');
     if (a === 'check') check();
     if (a === 'solve') { ctrl.solve(); e.target.closest('button').disabled = true; }
     if (a === 'next') { if (over || i >= qs.length - 1) finish(); else { i++; Sound.sfx('tap'); show(); } }
@@ -541,19 +548,23 @@ function openReference(age, set) {
 /* ---------------- Tetapan ---------------- */
 function openSettings() {
   const s = DB.settings; const vs = Sound.voiceStatus();
-  const LN = { ms: 'Bahasa Melayu', en: 'Bahasa Inggeris', ar: 'Bahasa Arab' };
+  const LN = { ms: 'Bahasa Melayu (Malaysia)', en: 'English', ar: 'Bahasa Arab' };
   screen(`<div class="house"><div class="h-head"><button class="btn icon" data-act="out">⬅</button><div><h2>⚙️ Tetapan</h2></div></div>
     <div class="h-body settings">
       <label class="row"><span>🔊 Suara sebutan</span><input type="checkbox" data-s="voice" ${s.voice ? 'checked' : ''}></label>
       <label class="row"><span>🎵 Kesan bunyi</span><input type="checkbox" data-s="sfx" ${s.sfx ? 'checked' : ''}></label>
       <label class="row"><span>🐢 Kelajuan suara</span><input type="range" min="0.6" max="1.2" step="0.05" value="${s.rate}" data-s="rate"></label>
       <div class="voices"><h4>Suara dalam peranti ini</h4>${vs.map(v => `<div class="vrow"><span>${LN[v.lang]}</span>
-        <b class="${v.ok ? 'ok' : 'no'}">${v.ok ? (v.fallback ? '⚠️ ' : '✅ ') + esc(v.name) : '❌ Tiada'}</b>
+        <b class="${!v.ok ? 'no' : v.fallback ? 'warn' : 'ok'}">${!v.ok ? '❌ Tiada' : v.fallback ? '⚠️ Tiada suara Melayu Malaysia. Sementara guna: ' + esc(v.name) : '✅ ' + esc(v.name)}</b>
         <button class="btn sm" data-test="${v.lang}">Uji</button></div>`).join('')}
-        <p class="tiny">Jika suara Bahasa Melayu tiada, aplikasi guna suara Bahasa Indonesia. Untuk pasang suara: Android → Tetapan → Pertuturan teks (Google) → muat turun bahasa. Windows → Tetapan → Masa &amp; Bahasa → Pertuturan.</p></div>
+        <p class="tiny">Suara datang daripada pelayar dan peranti, bukan daripada aplikasi. Untuk suara Melayu Malaysia dan Arab:<br>
+          • <b>Komputer:</b> buka guna <b>Microsoft Edge</b>. Edge ada suara Melayu (Malaysia) dan Arab. Chrome di Windows selalunya tiada kedua-duanya.<br>
+          • <b>Android:</b> Tetapan → Pertuturan teks (Text-to-speech) → enjin Google → Pasang data suara → muat turun <i>Melayu (Malaysia)</i> dan <i>Arab</i>.<br>
+          • <b>iPhone/iPad:</b> Settings → Accessibility → Spoken Content → Voices → muat turun <i>Malay</i> dan <i>Arabic</i>.<br>
+          Selepas pasang, tutup dan buka semula aplikasi. Jika suara Melayu Malaysia tiada langsung, aplikasi guna suara Indonesia buat sementara.</p></div>
       <div class="sbtns"><button class="btn" data-act="edit">🎨 Ubah Watak</button><button class="btn" data-act="switch">👥 Tukar Pemain</button>
         <button class="btn danger" data-act="reset">🗑 Padam Rekod Pemain Ini</button></div>
-      <p class="tiny">Celik Minda Quest · PWA luar talian · v1.0</p>
+      <p class="tiny">Celik Minda Quest · PWA luar talian · v1.2</p>
     </div></div>`, 'solid');
   overlay.onchange = e => {
     const k = e.target.dataset.s; if (!k) return;
@@ -561,7 +572,7 @@ function openSettings() {
   };
   overlay.onclick = e => {
     const t = e.target.closest('button'); if (!t) return;
-    const TEST = { ms: 'Selamat datang ke Celik Minda Quest', en: 'Welcome to Celik Minda Quest', ar: 'مَرْحَبًا، أَهْلًا وَسَهْلًا' };
+    const TEST = { ms: 'Selamat datang ke Celik Minda Quest. Ini huruf h.', en: 'Welcome to Celik Minda Quest.', ar: 'مَرْحَبًا، أَهْلًا وَسَهْلًا' };
     if (t.dataset.test) Sound.speak(TEST[t.dataset.test], t.dataset.test);
     if (t.dataset.act === 'out') { overlay.onchange = null; closeScreen(); }
     if (t.dataset.act === 'edit') { overlay.onchange = null; showCreator(true); }
