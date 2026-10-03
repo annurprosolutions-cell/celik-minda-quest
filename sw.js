@@ -1,5 +1,5 @@
 /* Service worker: simpan aplikasi untuk main tanpa internet */
-const VERSION = 'cmq-v1.2.0';
+const VERSION = 'cmq-v1.3.0';
 const APP = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/data.js', './js/papers.js', './js/sound.js', './js/avatar.js', './js/world.js', './js/quiz.js', './js/app.js',
@@ -8,7 +8,8 @@ const APP = [
 const FONT_CACHE = 'cmq-fonts';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(APP)).then(() => self.skipWaiting()));
+  // cache: 'reload' supaya fail diambil terus dari pelayan, bukan salinan lama dalam cache HTTP pelayar
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(APP.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

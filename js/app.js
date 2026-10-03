@@ -36,9 +36,7 @@ function closeScreen() {
 function init() {
   Sound.configure(DB.settings);
   Sound.onIssue = (lang, kind) => {
-    const L = { ms: 'Melayu Malaysia', en: 'English', ar: 'Arab' }[lang];
-    toast(kind === 'fallback' ? 'Peranti ini tiada suara Melayu Malaysia, jadi guna suara Indonesia buat sementara. Lihat ⚙️ Tetapan untuk cara pasang.'
-      : `Peranti ini tiada suara ${L}. Lihat ⚙️ Tetapan untuk cara pasang.`);
+    if (kind === 'fallback') toast('Peranti ini tiada suara Melayu Malaysia, jadi guna suara Indonesia buat sementara. Lihat ⚙️ Tetapan untuk cara pasang.');
   };
   world = new World($('#world'), {
     onNear: z => {
@@ -555,16 +553,18 @@ function openSettings() {
       <label class="row"><span>🎵 Kesan bunyi</span><input type="checkbox" data-s="sfx" ${s.sfx ? 'checked' : ''}></label>
       <label class="row"><span>🐢 Kelajuan suara</span><input type="range" min="0.6" max="1.2" step="0.05" value="${s.rate}" data-s="rate"></label>
       <div class="voices"><h4>Suara dalam peranti ini</h4>${vs.map(v => `<div class="vrow"><span>${LN[v.lang]}</span>
-        <b class="${!v.ok ? 'no' : v.fallback ? 'warn' : 'ok'}">${!v.ok ? '❌ Tiada' : v.fallback ? '⚠️ Tiada suara Melayu Malaysia. Sementara guna: ' + esc(v.name) : '✅ ' + esc(v.name)}</b>
+        <b class="${!v.ok ? 'warn' : v.fallback ? 'warn' : 'ok'}">${!v.ok ? '❓ Tiada dalam senarai. Tekan Uji, telefon mungkin masih boleh sebut.' : v.fallback ? '⚠️ Tiada suara Melayu Malaysia. Sementara guna: ' + esc(v.name) : '✅ ' + esc(v.name)}</b>
         <button class="btn sm" data-test="${v.lang}">Uji</button></div>`).join('')}
         <p class="tiny">Suara datang daripada pelayar dan peranti, bukan daripada aplikasi. Untuk suara Melayu Malaysia dan Arab:<br>
           • <b>Komputer:</b> buka guna <b>Microsoft Edge</b>. Edge ada suara Melayu (Malaysia) dan Arab. Chrome di Windows selalunya tiada kedua-duanya.<br>
           • <b>Android:</b> Tetapan → Pertuturan teks (Text-to-speech) → enjin Google → Pasang data suara → muat turun <i>Melayu (Malaysia)</i> dan <i>Arab</i>.<br>
           • <b>iPhone/iPad:</b> Settings → Accessibility → Spoken Content → Voices → muat turun <i>Malay</i> dan <i>Arabic</i>.<br>
-          Selepas pasang, tutup dan buka semula aplikasi. Jika suara Melayu Malaysia tiada langsung, aplikasi guna suara Indonesia buat sementara.</p></div>
+          Selepas pasang, tutup dan buka semula aplikasi. Jika suara Melayu Malaysia tiada langsung, aplikasi guna suara Indonesia buat sementara.</p>
+        <details class="vlist"><summary>Senarai semua suara dalam peranti (${Sound.voiceList().length})</summary>
+          ${Sound.voiceList().map(v => `<div>${esc(v.name)} <small>${esc(v.lang)}</small></div>`).join('') || '<div>Senarai kosong. Pelayar ini tidak menyenaraikan suara, tetapi mungkin masih boleh bercakap.</div>'}</details></div>
       <div class="sbtns"><button class="btn" data-act="edit">🎨 Ubah Watak</button><button class="btn" data-act="switch">👥 Tukar Pemain</button>
         <button class="btn danger" data-act="reset">🗑 Padam Rekod Pemain Ini</button></div>
-      <p class="tiny">Celik Minda Quest · PWA luar talian · v1.2</p>
+      <p class="tiny">Celik Minda Quest · PWA luar talian · v1.3</p>
     </div></div>`, 'solid');
   overlay.onchange = e => {
     const k = e.target.dataset.s; if (!k) return;
@@ -597,7 +597,11 @@ async function doInstall() {
   else toast('Gunakan menu pelayar → "Pasang aplikasi" / "Add to Home screen".');
 }
 function registerSW() {
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => { });
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  // Bila versi baharu mengambil alih, muat semula sekali supaya pengguna terus dapat kemas kini
+  const hadController = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 
 document.addEventListener('DOMContentLoaded', init);
